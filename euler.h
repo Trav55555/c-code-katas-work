@@ -61,13 +61,14 @@ size_t euler_number_to_words(unsigned n, char *buf, size_t cap, size_t *needed);
 /* PE17: sum of letter counts over the inclusive range [lo, hi].
  * Guard: 1 <= lo <= hi <= 9999, else 0. */
 uint64_t euler_number_letter_counts(unsigned lo, unsigned hi);
-/* PE18: maximum top-to-bottom path sum over a triangle given as flat
- * row-major values (row i has row_len[i] == i + 1 entries).
- * 0 only on allocation failure (positive triangles never sum to 0). */
-uint64_t euler_maximum_path_sum(const unsigned *values,
-                                const unsigned *row_len, size_t nrows);
+/* PE18: maximum top-to-bottom path sum over a triangle of nrows rows,
+ * given as flat row-major values: row i holds i + 1 entries, so `values`
+ * has nrows (nrows + 1) / 2 of them (NULL only when nrows == 0).
+ * 0 for an empty triangle or when the scratch allocation fails or its size
+ * would overflow. Sums over fewer than 2^32 rows of unsigned values fit. */
+uint64_t euler_maximum_path_sum(const unsigned *values, size_t nrows);
 /* Sieve of Eratosthenes: primes <= `limit` ascending. snprintf-style
- * capacity: 0 fit, 1 truncated, -1 allocation failure. */
+ * capacity: 0 fit, 1 truncated, -1 allocation failure (*count = 0). */
 int euler_sieve(unsigned limit, unsigned *primes, size_t cap, size_t *count);
 
 #endif

@@ -506,31 +506,43 @@ uint64_t euler_number_letter_counts(unsigned lo, unsigned hi)
 
 /* ---------------- PE18: maximum path sum ---------------------------------- */
 
-uint64_t euler_maximum_path_sum(const unsigned *values,
-                                const unsigned *row_len, size_t nrows)
+uint64_t euler_maximum_path_sum(const unsigned *values, size_t nrows)
 {
     uint64_t *work;
-    size_t total = 0, i, row;
+    size_t total, i, row;
 
-    assert(values != NULL);
-    assert(row_len != NULL);
-    for (i = 0; i < nrows; i++) {
-        assert(row_len[i] == i + 1); /* triangle shape */
-        total += row_len[i];
-    }
+    assert(values != NULL || nrows == 0);
     if (nrows == 0)
         return 0;
+    /* total = nrows (nrows + 1) / 2 entries: halve the even factor, then
+     * check the product and the byte count before allocating. Since
+     * total * sizeof *work fits, the row offsets r (r + 1) below cannot
+     * overflow either. */
+    {
+        size_t a = nrows, b;
+        if (a == SIZE_MAX)
+            return 0;
+        b = a + 1;
+        if (a % 2 == 0)
+            a /= 2;
+        else
+            b /= 2;
+        if (a > SIZE_MAX / b || a * b > SIZE_MAX / sizeof *work)
+            return 0;
+        total = a * b;
+    }
     work = malloc(total * sizeof *work);
     if (work == NULL)
         return 0;
     for (i = 0; i < total; i++)
         work[i] = values[i];
-    /* bottom-up: fold each row into the row above */
+    /* bottom-up: fold each row into the row above; row r starts at
+     * r (r + 1) / 2 and has r + 1 entries */
     for (row = nrows - 1; row > 0; row--) {
         size_t base = row * (row + 1) / 2;
         size_t above = (row - 1) * row / 2;
         size_t k;
-        for (k = 0; k < row_len[row - 1]; k++) {
+        for (k = 0; k < row; k++) {
             uint64_t l = work[base + k], r = work[base + k + 1];
             work[above + k] += (l > r) ? l : r;
         }
@@ -557,8 +569,10 @@ int euler_sieve(unsigned limit, unsigned *primes, size_t cap, size_t *count)
         return 0;
     }
     composite = calloc((size_t)limit + 1, 1);
-    if (composite == NULL)
+    if (composite == NULL) {
+        *count = 0; /* nothing was counted */
         return -1;
+    }
     for (v = 2; (uint64_t)v * v <= limit; v++)
         if (!composite[v]) {
             uint64_t m;

@@ -612,11 +612,15 @@ static void test_euler(void)
     for (i = 0; i < 4; i++)
         ex_rows[i] = euler_tri_example[i];
     i = flatten_tri(ex_rows, euler_tri_example_len, 4, flat);
-    CHECK(i == 10 && euler_maximum_path_sum(flat, euler_tri_example_len, 4) == 23);
+    CHECK(i == 10 && euler_maximum_path_sum(flat, 4) == 23);
     for (i = 0; i < 15; i++)
         tri_rows[i] = euler_tri_18[i];
     i = flatten_tri(tri_rows, euler_tri_18_len, 15, flat);
-    CHECK(i == 120 && euler_maximum_path_sum(flat, euler_tri_18_len, 15) == 1074); /* PE18 */
+    CHECK(i == 120 && euler_maximum_path_sum(flat, 15) == 1074); /* PE18 */
+
+    CHECK(euler_maximum_path_sum(flat, 0) == 0);        /* empty triangle */
+    CHECK(euler_maximum_path_sum(flat, 1) == flat[0]);  /* apex only */
+    CHECK(euler_maximum_path_sum(flat, SIZE_MAX) == 0); /* entry count overflows */
 
     CHECK(euler_sieve(1, primes, 200, &count) == 0 && count == 0);
     CHECK(euler_sieve(30, primes, 200, &count) == 0 && count == 10);
