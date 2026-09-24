@@ -10,8 +10,9 @@
  *   auxiliary space) and accepts NULL.
  * Failure: bst_insert allocates before mutating, so -1 leaves the tree
  *   unchanged. Duplicate insert returns 1 and is a no-op.
- * Walk: in-order (ascending) via threaded traversal; the tree is restored
- *   before bst_walk returns and `visit` must be non-NULL.
+ * Walk: in-order (ascending) over parent links, O(1) auxiliary space. The
+ *   walk does not modify the tree, so `visit` (non-NULL) may call the
+ *   read-only functions on it; it must not insert, remove, or destroy.
  * Cost: no balancing -- operations are O(height), worst case O(n) on
  *   sorted insert order. Removal handles the two-child case by copying
  *   the in-order successor and freeing its node. */
@@ -24,6 +25,6 @@ int   bst_insert(BST *tree, int value);   /* 0 inserted, 1 duplicate, -1 alloc *
 int   bst_contains(const BST *tree, int value);
 int   bst_remove(BST *tree, int value);   /* 1 removed, 0 absent */
 size_t bst_size(const BST *tree);
-void  bst_walk(BST *tree, BSTVisitFunc visit, void *user); /* ascending */
+void  bst_walk(const BST *tree, BSTVisitFunc visit, void *user); /* ascending */
 
 #endif

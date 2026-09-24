@@ -246,6 +246,17 @@ static void collect_visit(int value, void *user)
     walk_count++;
 }
 
+/* Visitor that reads the tree it is walking. With a threaded (Morris) walk
+ * the lookup for 15 follows a temporary thread back up the tree forever. */
+static size_t reader_visits, reader_hits;
+static void reader_visit(int value, void *user)
+{
+    const BST *t = user;
+    reader_visits++;
+    if (bst_contains(t, value) && !bst_contains(t, 15) && bst_size(t) == 5)
+        reader_hits++;
+}
+
 static void test_bst(void)
 {
     static const int keys[7] = { 5, 3, 8, 1, 4, 7, 9 };
@@ -291,8 +302,20 @@ static void test_bst(void)
     CHECK(bst_remove(t, 5) == 0);
     bst_destroy(t);
 
+    /* visit may read the tree being walked */
+    t = bst_create();
+    CHECK(t != NULL);
+    if (t == NULL)
+        return;
+    for (i = 0; i < 5; i++)
+        CHECK(bst_insert(t, (int[]){ 20, 10, 30, 12, 25 }[i]) == 0);
+    reader_visits = reader_hits = 0;
+    bst_walk(t, reader_visit, t);
+    CHECK(reader_visits == 5 && reader_hits == 5);
+    bst_destroy(t);
+
     /* degenerate (sorted insert) spine: exercises non-recursive teardown
-     * and the threaded walk at height n */
+     * and the walk at height n */
     t = bst_create();
     CHECK(t != NULL);
     if (t == NULL)

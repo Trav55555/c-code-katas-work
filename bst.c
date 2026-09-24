@@ -7,6 +7,7 @@ typedef struct BSTNode {
     int value;
     struct BSTNode *left;
     struct BSTNode *right;
+    struct BSTNode *parent; /* NULL at the root */
 } BSTNode;
 
 struct BST {
@@ -30,7 +31,8 @@ void bst_destroy(BST *tree)
     if (tree == NULL)
         return;
     /* Rotation-based teardown: always descend the left spine, freeing
-     * nodes on the right. No recursion, no side stack. */
+     * nodes on the right. No recursion, no side stack. Parent links go
+     * stale during the rotations, which is fine: nothing reads them. */
     n = tree->root;
     while (n != NULL) {
         if (n->left != NULL) {
@@ -49,14 +51,14 @@ void bst_destroy(BST *tree)
 
 int bst_insert(BST *tree, int value)
 {
-    BSTNode *n, **link;
+    BSTNode *n, **link, *parent = NULL;
     assert(tree != NULL);
     link = &tree->root;
     while (*link != NULL) {
-        n = *link;
-        if (value == n->value)
+        parent = *link;
+        if (value == parent->value)
             return 1; /* duplicate: no-op */
-        link = (value < n->value) ? &n->left : &n->right;
+        link = (value < parent->value) ? &parent->left : &parent->right;
     }
     n = malloc(sizeof *n); /* sole acquisition, before any mutation */
     if (n == NULL)
@@ -64,6 +66,7 @@ int bst_insert(BST *tree, int value)
     n->value = value;
     n->left = NULL;
     n->right = NULL;
+    n->parent = parent;
     *link = n;
     tree->size++;
     return 0;
@@ -105,9 +108,14 @@ int bst_remove(BST *tree, int value)
         }
         n->value = succ->value;
         *succ_link = succ->right;
+        if (succ->right != NULL)
+            succ->right->parent = succ->parent;
         free(succ);
     } else {
-        *link = (n->left != NULL) ? n->left : n->right;
+        BSTNode *child = (n->left != NULL) ? n->left : n->right;
+        *link = child;
+        if (child != NULL)
+            child->parent = n->parent;
         free(victim);
     }
     tree->size--;
@@ -120,30 +128,32 @@ size_t bst_size(const BST *tree)
     return tree->size;
 }
 
-/* Threaded (Morris) in-order traversal: O(1) auxiliary space, tree
- * restored before returning. */
-void bst_walk(BST *tree, BSTVisitFunc visit, void *user)
+static const BSTNode *leftmost(const BSTNode *n)
 {
-    BSTNode *n;
+    while (n->left != NULL)
+        n = n->left;
+    return n;
+}
+
+/* In-order walk over parent links: O(1) auxiliary space, and the tree is
+ * never modified, so `visit` may read it. */
+void bst_walk(const BST *tree, BSTVisitFunc visit, void *user)
+{
+    const BSTNode *n;
     assert(tree != NULL);
     assert(visit != NULL);
-    n = tree->root;
+    if (tree->root == NULL)
+        return;
+    n = leftmost(tree->root);
     while (n != NULL) {
-        if (n->left == NULL) {
-            visit(n->value, user);
-            n = n->right;
+        visit(n->value, user);
+        if (n->right != NULL) {
+            n = leftmost(n->right);
         } else {
-            BSTNode *pred = n->left;
-            while (pred->right != NULL && pred->right != n)
-                pred = pred->right;
-            if (pred->right == NULL) {
-                pred->right = n; /* thread */
-                n = n->left;
-            } else {
-                pred->right = NULL; /* unthread */
-                visit(n->value, user);
-                n = n->right;
-            }
+            /* climb until we leave a left subtree */
+            while (n->parent != NULL && n == n->parent->right)
+                n = n->parent;
+            n = n->parent;
         }
     }
 }
