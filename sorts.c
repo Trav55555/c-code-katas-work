@@ -67,18 +67,28 @@ void sorts_shell(int *a, size_t n)
                 swap_int(&a[j - gap], &a[j]);
 }
 
-/* Lomuto partition around a[hi]; returns the pivot's final index. */
-static size_t partition(int *a, size_t lo, size_t hi)
+/* Three-way (Dijkstra) partition around the value at a[hi]. On return
+ * a[lo, *lt) < pivot, a[*lt, *gt) == pivot, and a[*gt, hi] > pivot; the
+ * equal band is never empty. Grouping equal keys in one pass keeps
+ * duplicate-heavy input from degrading to quadratic time. */
+static void partition3(int *a, size_t lo, size_t hi, size_t *lt, size_t *gt)
 {
-    size_t i = lo, j;
     int pivot = a[hi];
-    for (j = lo; j < hi; j++)
-        if (a[j] < pivot) {
-            swap_int(&a[i], &a[j]);
+    size_t l = lo, i = lo, g = hi + 1; /* hi + 1 <= n: no wrap */
+    while (i < g) {
+        if (a[i] < pivot) {
+            swap_int(&a[l], &a[i]);
+            l++;
+            i++;
+        } else if (a[i] > pivot) {
+            g--;
+            swap_int(&a[i], &a[g]);
+        } else {
             i++;
         }
-    swap_int(&a[i], &a[hi]);
-    return i;
+    }
+    *lt = l;
+    *gt = g;
 }
 
 /* Median-of-three pivot moved to hi (deterministic variant). */
@@ -94,27 +104,29 @@ static void choose_pivot(int *a, size_t lo, size_t hi)
 }
 
 /* Recurse the smaller side, iterate the larger: depth <= log2 n.
- * seed == NULL selects the deterministic pivot; otherwise a uniformly
- * drawn index is swapped to hi first. */
+ * seed == NULL selects the median-of-three pivot; otherwise a uniformly
+ * drawn index (rejection sampled, no modulo bias) is swapped to hi. */
 static void quick_rec(int *a, size_t lo, size_t hi, uint64_t *seed)
 {
     while (lo < hi) {
-        size_t p;
+        size_t lt, gt;
         if (seed == NULL)
             choose_pivot(a, lo, hi);
         else
-            swap_int(&a[lo + (size_t)(rng_next(seed) % (hi - lo + 1))], &a[hi]);
-        p = partition(a, lo, hi);
-        if (p - lo < hi - p) {
-            if (p > lo)
-                quick_rec(a, lo, p - 1, seed);
-            lo = p + 1;
+            swap_int(&a[lo + (size_t)rng_below(seed, (uint64_t)(hi - lo) + 1)],
+                     &a[hi]);
+        partition3(a, lo, hi, &lt, &gt);
+        /* left part [lo, lt), right part [gt, hi]; parts of size < 2 are done */
+        if (lt - lo < hi + 1 - gt) {
+            if (lt - lo > 1)
+                quick_rec(a, lo, lt - 1, seed);
+            lo = gt; /* may pass hi, which ends the loop */
         } else {
-            if (p < hi)
-                quick_rec(a, p + 1, hi, seed);
-            if (p == lo)
+            if (hi + 1 - gt > 1)
+                quick_rec(a, gt, hi, seed);
+            if (lt - lo < 2)
                 break;
-            hi = p - 1;
+            hi = lt - 1;
         }
     }
 }

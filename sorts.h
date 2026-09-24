@@ -9,10 +9,13 @@
  * allocates nothing (no function here allocates). Comparison is total on
  * int. Stability: bubble and insertion are stable; selection, shell, and
  * the quick variants are not.
- * The quick variants recurse only the smaller partition and loop on the
- * larger one: stack depth is O(log n) even on adversarial input (time is
- * worst-case O(n^2) for the deterministic variant). The randomized variant
- * is deterministic for a given *seed and advances *seed. */
+ * The quick variants use a three-way partition, so runs of equal keys cost
+ * linear time, and recurse only the smaller part while looping on the
+ * larger: stack depth is O(log n) on any input. Time is worst-case O(n^2)
+ * for the deterministic variant on adversarial distinct keys and expected
+ * O(n log n) for the randomized one, whose pivot index is drawn without
+ * modulo bias. The randomized variant is deterministic for a given *seed
+ * (0 is remapped to a fixed nonzero state) and advances *seed. */
 void sorts_bubble(int *a, size_t n);
 void sorts_insertion(int *a, size_t n);
 void sorts_selection(int *a, size_t n);

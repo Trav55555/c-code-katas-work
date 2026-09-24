@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <limits.h>
+#include <time.h>
 
 #include "sorts.h"
 #include "search.h"
@@ -108,6 +109,33 @@ static void test_sorts(void)
         sorts_quick_randomized(a, 9, &s1);
         sorts_quick_randomized(b, 9, &s2);
         CHECK(s1 == s2 && memcmp(a, b, sizeof a) == 0);
+    }
+
+    /* Duplicate-heavy input must not go quadratic. A two-way partition
+     * takes ~50 s on 300k equal keys; three-way takes milliseconds. The
+     * budget is generous enough for sanitizer builds. */
+    {
+        enum { BIG = 300000 };
+        static int big[BIG];
+        size_t pass;
+        for (pass = 0; pass < 4; pass++) {
+            uint64_t seed = 7;
+            clock_t start;
+            double secs;
+            int ok = 1;
+            for (i = 0; i < BIG; i++)
+                big[i] = (pass % 2 == 0) ? 7 : (int)(t_next() % 3);
+            start = clock();
+            if (pass < 2)
+                sorts_quick(big, BIG);
+            else
+                sorts_quick_randomized(big, BIG, &seed);
+            secs = (double)(clock() - start) / CLOCKS_PER_SEC;
+            for (i = 1; i < BIG; i++)
+                ok &= big[i - 1] <= big[i];
+            CHECK(ok);
+            CHECK(secs < 2.0);
+        }
     }
 }
 
