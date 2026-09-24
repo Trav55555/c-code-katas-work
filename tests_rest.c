@@ -496,20 +496,45 @@ static void test_euler(void)
     CHECK(euler_number_name_letters(115) == 20);  /* PE17 example */
     CHECK(euler_number_name_letters(1000) == 11); /* "one thousand" */
     CHECK(euler_number_letter_counts(1, 1000) == 21124);  /* PE17 */
-    euler_number_to_words(342, words, sizeof words, &needed);
-    CHECK(needed == 23 && strcmp(words, "three hundred and forty-two") == 0);
+    CHECK(euler_number_letter_counts(1, 9999) > 0);
+    CHECK(euler_number_letter_counts(1, 10000) == 0); /* beyond the helper range */
+    CHECK(euler_number_letter_counts(9999, 9999) == euler_number_name_letters(9999));
+    CHECK(euler_number_name_letters(10000) == 0);
+
+    /* snprintf contract: *needed counts characters (spaces and hyphens too) */
+    CHECK(euler_number_to_words(342, words, sizeof words, &needed) == 27);
+    CHECK(needed == 27 && strcmp(words, "three hundred and forty-two") == 0);
     euler_number_to_words(115, words, sizeof words, &needed);
     CHECK(strcmp(words, "one hundred and fifteen") == 0);
     euler_number_to_words(1000, words, sizeof words, &needed);
     CHECK(strcmp(words, "one thousand") == 0);
+    euler_number_to_words(1001, words, sizeof words, &needed);
+    CHECK(strcmp(words, "one thousand and one") == 0);
+    euler_number_to_words(1200, words, sizeof words, &needed);
+    CHECK(strcmp(words, "one thousand two hundred") == 0);
     euler_number_to_words(21, words, sizeof words, &needed);
     CHECK(strcmp(words, "twenty-one") == 0);
     euler_number_to_words(0, words, sizeof words, &needed);
     CHECK(strcmp(words, "zero") == 0 && needed == 4);
-    { /* snprintf-style truncation */
-        char tiny[4];
-        size_t wrote = euler_number_to_words(342, tiny, sizeof tiny, &needed);
-        CHECK(needed == 23 && wrote == 4); /* cap hit, count still reported */
+    CHECK(euler_number_to_words(10000, words, sizeof words, &needed) == 0);
+    CHECK(needed == 0 && words[0] == '\0');
+    CHECK(euler_number_to_words(342, NULL, 0, &needed) == 0 && needed == 27);
+    { /* truncation: always a NUL-terminated prefix of the full name */
+        static const unsigned samples[] = { 0, 7, 21, 342, 1001, 1200, 7777, 9999 };
+        char full[64], part[64];
+        size_t s, cap, full_len, part_needed, wrote;
+        for (s = 0; s < sizeof samples / sizeof samples[0]; s++) {
+            full_len = euler_number_to_words(samples[s], full, sizeof full, &needed);
+            CHECK(full_len == needed && strlen(full) == needed);
+            for (cap = 1; cap <= needed + 1; cap++) {
+                memset(part, '#', sizeof part);
+                wrote = euler_number_to_words(samples[s], part, cap, &part_needed);
+                CHECK(part_needed == needed);
+                CHECK(wrote == cap - 1);
+                CHECK(part[wrote] == '\0' && strncmp(part, full, wrote) == 0);
+                CHECK(part[cap] == '#'); /* nothing written past cap */
+            }
+        }
     }
 
     /* PE18: the example triangle (23) and the problem triangle (1074) */

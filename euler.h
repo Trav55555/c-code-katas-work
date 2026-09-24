@@ -47,13 +47,18 @@ uint64_t euler_lattice_paths(unsigned w, unsigned h);
 /* PE16: sum of decimal digits of 2^exponent. Guard: exponent <= 200000.
  * 0 on allocation failure (a power of two never has digit sum 0). */
 uint64_t euler_power_digit_sum(unsigned exponent);
-/* PE17 helpers: British naming ("one hundred and forty-two"); letters
- * count excludes spaces and hyphens. Guards: n <= 9999.
- * number_to_words is snprintf-style (chars written, *needed = total
- * excluding NUL). */
+/* PE17 helpers: British naming ("one hundred and forty-two").
+ * euler_number_name_letters counts letters only (no spaces or hyphens);
+ * 0 for n > 9999.
+ * euler_number_to_words is snprintf-style: *needed is the full name's
+ * length in characters, excluding the NUL; when cap > 0 the first
+ * min(*needed, cap - 1) characters and a NUL are written, and that count is
+ * returned. Nothing is written when cap == 0 (buf may then be NULL).
+ * n > 9999 is out of range: *needed = 0 and an empty string. */
 size_t euler_number_name_letters(unsigned n);
 size_t euler_number_to_words(unsigned n, char *buf, size_t cap, size_t *needed);
-/* PE17: sum of letter counts over the inclusive range [lo, hi]. */
+/* PE17: sum of letter counts over the inclusive range [lo, hi].
+ * Guard: 1 <= lo <= hi <= 9999, else 0. */
 uint64_t euler_number_letter_counts(unsigned lo, unsigned hi);
 /* PE18: maximum top-to-bottom path sum over a triangle given as flat
  * row-major values (row i has row_len[i] == i + 1 entries).

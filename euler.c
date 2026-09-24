@@ -404,125 +404,99 @@ static const char *const tens[10] = {
     "eighty", "ninety"
 };
 
-/* Emit the British name of 1 <= n <= 999 (or the word "zero") and return
- * its letter count (spaces and hyphens are written but not counted). */
-static size_t name_letters_999(unsigned n, char *buf, size_t cap, size_t *pos)
-{
-    size_t needed = 0;
-#define EMIT(str) \
-    do { \
-        const char *w_ = (str); \
-        size_t l_ = strlen(w_); \
-        if (buf != NULL && *pos + l_ <= cap) { \
-            memcpy(buf + *pos, w_, l_); \
-            *pos += l_; \
-        } \
-        needed += l_; \
-    } while (0)
-#define EMITC(ch) \
-    do { \
-        if (buf != NULL && *pos + 1 <= cap) { \
-            buf[*pos] = (ch); \
-            *pos += 1; \
-        } \
-    } while (0)
+/* Longest name in range: "seven thousand seven hundred and seventy-seven"
+ * is 46 characters; the buffer leaves slack and the appender asserts it. */
+enum { NAME_BUF = 64 };
 
-    if (n >= 100) {
-        EMIT(ones[n / 100]);
-        EMITC(' ');
-        EMIT("hundred");
-        n %= 100;
-        if (n != 0) {
-            EMITC(' ');
-            EMIT("and");
-            EMITC(' ');
-        }
-    }
-    if (n >= 20) {
-        EMIT(tens[n / 10]);
-        if (n % 10 != 0) {
-            EMITC('-');
-            EMIT(ones[n % 10]);
-        }
-    } else if (n > 0) {
-        EMIT(ones[n]);
-    }
-#undef EMIT
-#undef EMITC
-    return needed;
+static void append_word(char *out, size_t *len, const char *word)
+{
+    size_t l = strlen(word);
+    assert(*len + l < NAME_BUF);
+    memcpy(out + *len, word, l);
+    *len += l;
+    out[*len] = '\0';
 }
 
-/* Shared writer for the full range 0 <= n <= 9999. British "and" appears
- * after a hundred remainder and after "thousand" when the remainder is
- * below 100. Returns the letter count. */
-static size_t write_name(unsigned n, char *buf, size_t cap, size_t *pos)
+/* Append the British name of 1 <= n <= 999. */
+static void append_999(unsigned n, char *out, size_t *len)
 {
-    size_t letters = 0;
-    if (n == 0) {
-        /* "zero" */
-        if (buf != NULL && *pos + 4 <= cap) {
-            memcpy(buf + *pos, "zero", 4);
-            *pos += 4;
+    if (n >= 100) {
+        append_word(out, len, ones[n / 100]);
+        append_word(out, len, " hundred");
+        n %= 100;
+        if (n != 0)
+            append_word(out, len, " and ");
+    }
+    if (n >= 20) {
+        append_word(out, len, tens[n / 10]);
+        if (n % 10 != 0) {
+            append_word(out, len, "-");
+            append_word(out, len, ones[n % 10]);
         }
-        return 4;
+    } else if (n > 0) {
+        append_word(out, len, ones[n]);
+    }
+}
+
+/* Write the full name of 0 <= n <= 9999 into out[NAME_BUF] and return its
+ * length. British "and" follows a hundreds part with a remainder, and
+ * follows "thousand" when the remainder is below 100. */
+static size_t build_name(unsigned n, char *out)
+{
+    size_t len = 0;
+    assert(n <= 9999);
+    out[0] = '\0';
+    if (n == 0) {
+        append_word(out, &len, "zero");
+        return len;
     }
     if (n >= 1000) {
-        letters += name_letters_999(n / 1000, buf, cap, pos);
-        if (buf != NULL && *pos + 1 <= cap) {
-            buf[*pos] = ' ';
-            *pos += 1;
-        }
-        if (buf != NULL && *pos + 8 <= cap) {
-            memcpy(buf + *pos, "thousand", 8);
-            *pos += 8;
-        }
-        letters += 8;
+        append_999(n / 1000, out, &len);
+        append_word(out, &len, " thousand");
         n %= 1000;
-        if (n != 0 && n < 100) {
-            if (buf != NULL && *pos + 5 <= cap) {
-                memcpy(buf + *pos, " and ", 5);
-                *pos += 5;
-            }
-            letters += 3;
-        }
-        if (n >= 100 && buf != NULL && *pos + 1 <= cap) {
-            buf[*pos] = ' ';
-            *pos += 1;
-        }
+        if (n != 0)
+            append_word(out, &len, (n < 100) ? " and " : " ");
     }
     if (n > 0)
-        letters += name_letters_999(n, buf, cap, pos);
-    return letters;
+        append_999(n, out, &len);
+    return len;
 }
 
 size_t euler_number_to_words(unsigned n, char *buf, size_t cap, size_t *needed)
 {
-    size_t pos = 0;
+    char name[NAME_BUF];
+    size_t len = 0, wrote;
     assert(needed != NULL);
     assert(buf != NULL || cap == 0);
-    if (n > 9999) {
-        *needed = 0;
+    if (n <= 9999)
+        len = build_name(n, name);
+    *needed = len;
+    if (cap == 0)
         return 0;
-    }
-    *needed = write_name(n, buf, cap, &pos);
-    if (buf != NULL && pos < cap)
-        buf[pos] = '\0';
-    return (buf != NULL && pos < cap) ? pos : cap;
+    wrote = (len < cap) ? len : cap - 1;
+    memcpy(buf, name, wrote);
+    buf[wrote] = '\0';
+    return wrote;
 }
 
 size_t euler_number_name_letters(unsigned n)
 {
-    size_t pos = 0;
+    char name[NAME_BUF];
+    size_t len, i, letters = 0;
     if (n > 9999)
         return 0;
-    return write_name(n, NULL, 0, &pos);
+    len = build_name(n, name);
+    for (i = 0; i < len; i++)
+        if (name[i] != ' ' && name[i] != '-')
+            letters++;
+    return letters;
 }
 
 uint64_t euler_number_letter_counts(unsigned lo, unsigned hi)
 {
     uint64_t sum = 0;
     unsigned i;
-    if (lo < 1 || lo > hi || hi > 1000000)
+    if (lo < 1 || lo > hi || hi > 9999)
         return 0;
     for (i = lo; i <= hi; i++)
         sum += (uint64_t)euler_number_name_letters(i);
