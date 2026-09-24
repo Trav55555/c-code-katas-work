@@ -166,14 +166,14 @@ static void test_search(void)
     CHECK(search_binary(sorted, 8, 14) == -1);
     CHECK(search_binary(sorted, 8, 6) == -1);
     {
-        long idx = search_binary(sorted, 8, 3);
+        ptrdiff_t idx = search_binary(sorted, 8, 3);
         CHECK(idx == 1 || idx == 2); /* either duplicate */
     }
     CHECK(search_binary_rec(sorted, 8, 1) == 0);
     CHECK(search_binary_rec(sorted, 8, 13) == 7);
     CHECK(search_binary_rec(sorted, 8, 4) == -1);
     {
-        long idx = search_binary_rec(sorted, 8, 3);
+        ptrdiff_t idx = search_binary_rec(sorted, 8, 3);
         CHECK(idx == 1 || idx == 2);
     }
 
@@ -182,10 +182,10 @@ static void test_search(void)
         big[i] = (int)i * 2;
     for (i = 0; i < 200; i++) {
         int key = (int)(t_next() % 2100);
-        long l1 = search_binary(big, 1000, key);
-        long l2 = search_binary_rec(big, 1000, key);
-        long l3 = search_linear(big, 1000, key);
-        long l4 = search_linear_rec(big, 1000, key);
+        ptrdiff_t l1 = search_binary(big, 1000, key);
+        ptrdiff_t l2 = search_binary_rec(big, 1000, key);
+        ptrdiff_t l3 = search_linear(big, 1000, key);
+        ptrdiff_t l4 = search_linear_rec(big, 1000, key);
         CHECK((l1 < 0) == (l3 < 0));  /* found/not-found agreement */
         CHECK((l1 < 0) == (l2 < 0));
         CHECK(l3 == l4);
