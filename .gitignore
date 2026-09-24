@@ -1,0 +1,11 @@
+# build outputs
+run_tests
+run_tests_release
+run_tests_asan
+run_fault
+run_fault_asan
+uaf_probe
+fuzz_test
+std_test
+uaf_probe.out
+*.o
