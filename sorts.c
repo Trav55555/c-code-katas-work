@@ -2,6 +2,8 @@
 
 #include <assert.h>
 
+#include "rng.h"
+
 static void swap_int(int *x, int *y)
 {
     int t = *x;
@@ -89,16 +91,6 @@ static void choose_pivot(int *a, size_t lo, size_t hi)
         swap_int(&a[hi], &a[lo]);
     if (a[mid] < a[hi])
         swap_int(&a[mid], &a[hi]);
-}
-
-static uint64_t rng_next(uint64_t *state)
-{
-    uint64_t x = *state;
-    x ^= x >> 12;
-    x ^= x << 25;
-    x ^= x >> 27;
-    *state = x;
-    return x * UINT64_C(2685821657736338717);
 }
 
 /* Recurse the smaller side, iterate the larger: depth <= log2 n.

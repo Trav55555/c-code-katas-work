@@ -1,23 +1,8 @@
 #include "recmath.h"
+#include "checked.h"
 
 #include <assert.h>
 #include <stddef.h>
-
-static int mul_ok(uint64_t a, uint64_t b, uint64_t *out)
-{
-    if (a != 0 && b > UINT64_MAX / a)
-        return 1;
-    *out = a * b;
-    return 0;
-}
-
-static int add_ok(uint64_t a, uint64_t b, uint64_t *out)
-{
-    if (b > UINT64_MAX - a)
-        return 1;
-    *out = a + b;
-    return 0;
-}
 
 static int fact_rec(unsigned n, uint64_t *out)
 {

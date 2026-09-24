@@ -1,27 +1,12 @@
 #include "euler.h"
 #include "euler_data.h"
 #include "num.h"
+#include "checked.h"
 
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-static int mul_ok(uint64_t a, uint64_t b, uint64_t *out)
-{
-    if (a != 0 && b > UINT64_MAX / a)
-        return 1;
-    *out = a * b;
-    return 0;
-}
-
-static int add_ok(uint64_t a, uint64_t b, uint64_t *out)
-{
-    if (b > UINT64_MAX - a)
-        return 1;
-    *out = a + b;
-    return 0;
-}
 
 static uint64_t pow10(unsigned e)
 {
