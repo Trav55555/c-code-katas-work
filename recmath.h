@@ -30,8 +30,9 @@ int recmath_sum_of_digits(int64_t n);
 int recmath_ackermann(unsigned m, unsigned n, uint64_t *out);
 
 /* Emit the 2^disks - 1 moves solving Tower of Hanoi (pegs 1..3, all disks
- * start on peg 1) through `move` (non-NULL). Guard: disks <= 63.
- * Depth O(disks); total moves exponential in disks. */
+ * start on peg 1) through `move` (non-NULL). Depth O(disks). Guard:
+ * disks <= 20, a work bound like Ackermann's: 2^20 - 1 (about a million)
+ * moves; each extra disk doubles the work. */
 int recmath_tower_of_hanoi(unsigned disks, HanoiMoveFunc move, void *user);
 
 #endif

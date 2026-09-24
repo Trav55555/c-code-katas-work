@@ -4,8 +4,8 @@
 /* Luhn checksum validation over an untrusted ASCII digit string.
  *
  * Contract:
- *  - `digits` is non-NULL and NUL-terminated; arbitrary untrusted bytes are
- *    accepted. ASCII digits count; a space ' ' is skipped anywhere; any other
+ *  - `digits` is NUL-terminated, or NULL (treated as invalid: returns 0);
+ *    arbitrary untrusted bytes are accepted. ASCII digits count; a space ' ' is skipped anywhere; any other
  *    byte (control bytes included) makes the number invalid.
  *  - At least one digit is required: empty and all-spaces strings are invalid.
  *  - Length is unbounded. Cost is linear, no allocation, no mutation of input.

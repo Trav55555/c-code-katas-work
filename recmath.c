@@ -103,8 +103,8 @@ static void hanoi_rec(unsigned disks, unsigned from, unsigned to,
 int recmath_tower_of_hanoi(unsigned disks, HanoiMoveFunc move, void *user)
 {
     assert(move != NULL);
-    if (disks > 63)
-        return 1; /* 2^disks - 1 moves would exceed any budget */
+    if (disks > 20)
+        return 1; /* work bound: 2^disks - 1 moves */
     hanoi_rec(disks, 1, 3, 2, move, user);
     return 0;
 }

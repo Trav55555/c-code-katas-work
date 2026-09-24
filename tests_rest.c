@@ -491,7 +491,17 @@ static void test_recmath(void)
     CHECK(recmath_tower_of_hanoi(3, hanoi_step, NULL) == 0);
     CHECK(hanoi_ok == 1 && hanoi_moves == 7 && hanoi_depth[3] == 3);
     CHECK(recmath_tower_of_hanoi(0, hanoi_step, NULL) == 0);
-    CHECK(recmath_tower_of_hanoi(64, hanoi_step, NULL) == 1); /* guard */
+    /* the largest allowed tower: 2^20 - 1 legal moves */
+    hanoi_moves = 0;
+    hanoi_ok = 1;
+    hanoi_depth[1] = 20;
+    for (i = 0; i < 20; i++)
+        hanoi_top[1][i] = 20 - i;
+    hanoi_depth[2] = hanoi_depth[3] = 0;
+    CHECK(recmath_tower_of_hanoi(20, hanoi_step, NULL) == 0);
+    CHECK(hanoi_ok == 1 && hanoi_moves == 1048575UL && hanoi_depth[3] == 20);
+    CHECK(recmath_tower_of_hanoi(21, hanoi_step, NULL) == 1); /* ~2M moves: guard */
+    CHECK(recmath_tower_of_hanoi(64, hanoi_step, NULL) == 1);
 }
 
 /* ---------------- euler ---------------------------------------------------- */
