@@ -31,7 +31,8 @@ uint64_t euler_largest_product_in_series(size_t span);
  * 0 when no triplet exists. */
 uint64_t euler_pythagorean_triplet_product(unsigned sum);
 /* PE11: largest product of `span` adjacent grid values in any of the four
- * directions over the 20x20 grid. Guard: 1 <= span <= 20. */
+ * directions over the 20x20 grid. Guard: 1 <= span <= 20. 0 on overflow
+ * (span >= 11 on this grid). */
 uint64_t euler_largest_product_in_grid(size_t span);
 /* PE12: first triangle number with MORE than `min_divisors` divisors. */
 uint64_t euler_highly_divisible_triangle(unsigned min_divisors);

@@ -20,7 +20,9 @@ static uint64_t pow10(unsigned e)
 
 /* ---------------- PE1, PE2: series sums --------------------------------- */
 
-/* m * (1 + 2 + ... + k) with k = (limit - 1) / m; 1 on overflow. */
+/* m * (1 + 2 + ... + k) with k = (limit - 1) / m; 1 on overflow.
+ * The even factor of k(k+1) is halved first, so only products can
+ * overflow, and both are checked. k + 1 cannot wrap because m >= 3. */
 static int sum_multiples_below(uint64_t m, uint64_t limit, uint64_t *out)
 {
     uint64_t k, t;
@@ -28,21 +30,26 @@ static int sum_multiples_below(uint64_t m, uint64_t limit, uint64_t *out)
     if (limit <= m)
         return 0; /* genuine empty sum, not an overflow */
     k = (limit - 1) / m;
-    if (k % 2 == 0)
-        t = (k / 2) * (k + 1);
-    else
-        t = k * ((k + 1) / 2);
+    if (k % 2 == 0 ? mul_ok(k / 2, k + 1, &t) : mul_ok(k, (k + 1) / 2, &t))
+        return 1;
     return mul_ok(t, m, out);
 }
 
 uint64_t euler_multiples_3_5(uint64_t limit)
 {
-    uint64_t a, b, c;
+    uint64_t a, b, c, sum;
+    /* Each partial sum is below the answer, so a partial overflow implies
+     * the answer overflows too. */
     if (sum_multiples_below(3, limit, &a) ||
         sum_multiples_below(5, limit, &b) ||
         sum_multiples_below(15, limit, &c))
         return 0; /* documented overflow indicator */
-    return a + b - c; /* inclusion-exclusion */
+    /* Inclusion-exclusion as a + (b - c): multiples of 15 are a subset of
+     * the multiples of 5, so b >= c, and a + b may overflow even when the
+     * answer fits. */
+    if (add_ok(a, b - c, &sum))
+        return 0;
+    return sum;
 }
 
 uint64_t euler_even_fibonacci_sum(uint64_t limit)
@@ -185,31 +192,20 @@ uint64_t euler_smallest_multiple(unsigned lo, unsigned hi)
 
 uint64_t euler_sum_square_difference(unsigned n)
 {
-    uint64_t s, q, sq, t;
-    if (n == 0)
+    uint64_t m = n, s, q, sq, f;
+    if (m == 0)
         return 0;
-    /* s = n(n+1)/2, sq = n(n+1)(2n+1)/6, both halved/divided first */
-    if (n % 2 == 0)
-        t = (n / 2) * (n + 1);
-    else
-        t = n * ((n + 1) / 2);
-    s = t;
+    /* Widen before any arithmetic: in unsigned int, n(n+1)/2 wraps for
+     * n > 92681. s = n(n+1)/2 <= 2^63 fits in uint64 for any unsigned n. */
+    s = (m % 2 == 0) ? (m / 2) * (m + 1) : m * ((m + 1) / 2);
     if (mul_ok(s, s, &q))
         return 0;
-    /* sq = s * (2n + 1) / 3, dividing before multiplying */
-    {
-        uint64_t f = 2 * n + 1;
-        if (f % 3 == 0) {
-            f /= 3;
-            if (mul_ok(s, f, &sq))
-                return 0;
-        } else {
-            /* 3 divides s whenever it divides n(n+1)(2n+1)/6 overall */
-            if (mul_ok(s / 3, f, &sq))
-                return 0;
-        }
-    }
-    return (q > sq) ? q - sq : 0;
+    /* sum of squares = s * (2n + 1) / 3, dividing before multiplying:
+     * 3 divides n(n+1)(2n+1), so it divides s when it misses 2n + 1. */
+    f = 2 * m + 1;
+    if (f % 3 == 0 ? mul_ok(s, f / 3, &sq) : mul_ok(s / 3, f, &sq))
+        return 0;
+    return q - sq; /* sum of squares <= square of the sum */
 }
 
 /* ---------------- PE8, PE11: windowed products --------------------------- */
@@ -249,7 +245,8 @@ uint64_t euler_largest_product_in_grid(size_t span)
                         p = 0;
                         break;
                     }
-                    p *= euler_grid_20[cy][cx];
+                    if (mul_ok(p, euler_grid_20[cy][cx], &p))
+                        return 0; /* the largest product leaves uint64 */
                     cx += dx[dir];
                     cy += dy[dir];
                 }
@@ -356,11 +353,15 @@ uint64_t euler_longest_collatz(uint64_t limit)
 uint64_t euler_lattice_paths(unsigned w, unsigned h)
 {
     uint64_t n = (uint64_t)w + h, k = (w < h) ? w : h, res = 1, i;
+    /* res steps through C(n - k + i, i), which only grows, so overflow
+     * of an intermediate means overflow of the answer. res * num is
+     * divisible by i; dividing gcd(res, i) out of res leaves a divisor of
+     * num, so the division happens before the multiplication. */
     for (i = 1; i <= k; i++) {
-        uint64_t num = n - k + i, t;
-        if (mul_ok(res, num, &t))
+        uint64_t num = n - k + i, g = num_gcd(res, i), t;
+        if (mul_ok(res / g, num / (i / g), &t))
             return 0;
-        res = t / i; /* binomial partial products stay divisible */
+        res = t;
     }
     return res;
 }

@@ -492,6 +492,26 @@ static void test_euler(void)
     CHECK(euler_power_digit_sum(15) == 26);  /* 32768 */
     CHECK(euler_power_digit_sum(1000) == 1366);            /* PE16 */
 
+    /* Overflow boundaries: exact at the last representable input, 0 (the
+     * documented overflow indicator) just past it. References computed
+     * with arbitrary-precision integers. */
+    CHECK(euler_multiples_3_5(UINT64_C(8891427027)) ==
+          UINT64_C(18446744066952937668)); /* a + b alone overflows here */
+    CHECK(euler_multiples_3_5(UINT64_C(8891427028)) == 0);
+    CHECK(euler_multiples_3_5(UINT64_C(10000000000)) == 0);
+    CHECK(euler_multiples_3_5(UINT64_MAX) == 0);
+    CHECK(euler_sum_square_difference(92681) == UINT64_C(18446160229542257100));
+    CHECK(euler_sum_square_difference(92682) == 0);
+    CHECK(euler_sum_square_difference(100000) == 0);
+    CHECK(euler_sum_square_difference(UINT_MAX) == 0);
+    CHECK(euler_largest_product_in_grid(10) == UINT64_C(2583621418281932160));
+    CHECK(euler_largest_product_in_grid(11) == 0);
+    CHECK(euler_largest_product_in_grid(20) == 0);
+    CHECK(euler_lattice_paths(0, 5) == 1);
+    CHECK(euler_lattice_paths(33, 33) == UINT64_C(7219428434016265740));
+    CHECK(euler_lattice_paths(34, 33) == UINT64_C(14226520737620288370));
+    CHECK(euler_lattice_paths(34, 34) == 0);
+
     CHECK(euler_number_name_letters(342) == 23);  /* PE17 example */
     CHECK(euler_number_name_letters(115) == 20);  /* PE17 example */
     CHECK(euler_number_name_letters(1000) == 11); /* "one thousand" */
