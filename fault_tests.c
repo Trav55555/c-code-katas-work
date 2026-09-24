@@ -1,5 +1,4 @@
-/* Allocation-failure injection tests: the failure paths of the modules'
- * contracts ("returns NULL/-1 and leaves the list/array UNMODIFIED").
+/* Allocation-failure tests for slist, msort, dlist, and bst failure paths.
  * Built with -Dmalloc=fault_malloc over the module sources. */
 #include <stdio.h>
 #include <string.h>
@@ -8,6 +7,8 @@
 #include "fault_alloc.h"
 #include "slist.h"
 #include "msort.h"
+#include "dlist.h"
+#include "bst.h"
 
 static int failures = 0;
 #define CHECK(cond) \
@@ -77,10 +78,66 @@ static void test_msort_failures(void)
     CHECK(msort_sort(a, 5) == 0 && a[0] == 1 && a[4] == 5);
 }
 
+static void test_dlist_failures(void)
+{
+    DList *l;
+
+    fault_alloc_countdown = 0;
+    CHECK(dlist_create() == NULL);
+    fault_alloc_countdown = 1;
+    l = dlist_create();
+    CHECK(l != NULL);
+    if (l == NULL)
+        return;
+    fault_alloc_countdown = 0;
+    CHECK(dlist_append(l, 1) == -1);          /* node malloc fails */
+    CHECK(dlist_length(l) == 0);              /* unchanged */
+    fault_alloc_countdown = 2;
+    CHECK(dlist_append(l, 1) == 0);
+    CHECK(dlist_append(l, 2) == 0);
+    fault_alloc_countdown = 0;
+    CHECK(dlist_append(l, 3) == -1);
+    CHECK(dlist_length(l) == 2);              /* prior outputs preserved */
+    CHECK(*dlist_get(l, 0) == 1 && *dlist_get(l, 1) == 2);
+    fault_alloc_countdown = -1;
+    dlist_destroy(l);
+}
+
+static void test_bst_failures(void)
+{
+    BST *t;
+
+    fault_alloc_countdown = 0;
+    CHECK(bst_create() == NULL);
+    fault_alloc_countdown = 1;
+    t = bst_create();
+    CHECK(t != NULL);
+    if (t == NULL)
+        return;
+    fault_alloc_countdown = 0;
+    CHECK(bst_insert(t, 5) == -1);   /* node malloc fails before mutation */
+    CHECK(bst_size(t) == 0);         /* tree unchanged */
+    CHECK(!bst_contains(t, 5));
+    fault_alloc_countdown = 3;
+    CHECK(bst_insert(t, 5) == 0);
+    CHECK(bst_insert(t, 3) == 0);
+    CHECK(bst_insert(t, 8) == 0);
+    fault_alloc_countdown = 0;
+    CHECK(bst_insert(t, 4) == -1);
+    CHECK(bst_size(t) == 3);         /* partial tree preserved */
+    CHECK(bst_contains(t, 5) && bst_contains(t, 3) && bst_contains(t, 8));
+    fault_alloc_countdown = -1;
+    CHECK(bst_insert(t, 4) == 0);    /* recovery works */
+    CHECK(bst_size(t) == 4);
+    bst_destroy(t);
+}
+
 int main(void)
 {
     test_slist_failures();
     test_msort_failures();
+    test_dlist_failures();
+    test_bst_failures();
     printf("%s: %d failure(s)\n", failures ? "FAIL" : "OK", failures);
     return failures ? 1 : 0;
 }

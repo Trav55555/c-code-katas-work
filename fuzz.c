@@ -14,6 +14,9 @@
 #include "msort.h"
 #include "reservoir.h"
 #include "pfac.h"
+#include "sorts.h"
+#include "strs.h"
+#include "search.h"
 
 static uint64_t f_state = UINT64_C(0x0123456789ABCDEF);
 static uint64_t f_next(void)
@@ -241,6 +244,99 @@ static void fuzz_pfac(size_t iters)
            (unsigned)iters);
 }
 
+/* ---------------- sorts: differential vs reference ----------------------- */
+
+static void fuzz_sorts(size_t iters)
+{
+    enum { N = 300 };
+    int a[N], b[N];
+    size_t it, i, n;
+
+    for (it = 0; it < iters; it++) {
+        uint64_t seed = f_next();
+        n = (size_t)(f_next() % (N + 1));
+        for (i = 0; i < n; i++)
+            a[i] = b[i] = (int)(f_next() % 21) - 10;
+        ref_sort(b, n);
+        switch (it % 6) {
+        case 0: sorts_bubble(a, n); break;
+        case 1: sorts_insertion(a, n); break;
+        case 2: sorts_selection(a, n); break;
+        case 3: sorts_shell(a, n); break;
+        case 4: sorts_quick(a, n); break;
+        default: sorts_quick_randomized(a, n, &seed); break;
+        }
+        if (memcmp(a, b, n * sizeof a[0]) != 0)
+            fail("sort mismatch vs reference");
+    }
+    printf("fuzz sorts: %u iters, n 0..%d, all six vs reference\n",
+           (unsigned)iters, N);
+}
+
+/* ---------------- strs: involution and symmetry -------------------------- */
+
+static void fuzz_strs(size_t iters)
+{
+    enum { BUF = 256 };
+    char s[BUF + 1], rep[BUF + 1], again[BUF + 1], mirror[2 * BUF + 2];
+    size_t it, j, n, len;
+
+    for (it = 0; it < iters; it++) {
+        char from = (char)('a' + (f_next() % 4));
+        char to = (char)('a' + (f_next() % 4));
+        n = (size_t)(f_next() % (BUF + 1));
+        for (j = 0; j < n; j++)
+            s[j] = (char)('a' + (f_next() % 5));
+        s[n] = '\0';
+        strcpy(rep, s);
+        strs_replace(rep, from, to);
+        strcpy(again, rep);
+        strs_replace(again, from, to);
+        if (strcmp(again, rep) != 0)
+            fail("replace not idempotent");
+        strcpy(again, rep);
+        strs_reverse(again);
+        strs_reverse(again);
+        if (strcmp(again, rep) != 0)
+            fail("reverse involution broken");
+        /* mirror = rep + reverse(rep) always reads the same both ways */
+        len = strlen(rep);
+        memcpy(mirror, rep, len);
+        for (j = 0; j < len; j++)
+            mirror[len + j] = rep[len - 1 - j];
+        mirror[2 * len] = '\0';
+        if (strs_is_palindrome(mirror) != 1)
+            fail("mirrored string not recognized as palindrome");
+    }
+    printf("fuzz strs: %u iters, len 0..%d, replace/reverse/palindrome\n",
+           (unsigned)iters, BUF);
+}
+
+/* ---------------- search: agreement on sorted data ------------------------ */
+
+static void fuzz_search(size_t iters)
+{
+    enum { N = 256 };
+    int a[N];
+    size_t it, i, n;
+
+    for (it = 0; it < iters; it++) {
+        int key = (int)(f_next() % 100);
+        n = (size_t)(f_next() % (N + 1));
+        for (i = 0; i < n; i++)
+            a[i] = (int)(f_next() % 100);
+        ref_sort(a, n); /* binary search precondition */
+        if ((search_binary(a, n, key) < 0) != (search_linear(a, n, key) < 0))
+            fail("binary/linear found-mismatch");
+        if ((search_binary_rec(a, n, key) < 0) != (search_binary(a, n, key) < 0))
+            fail("binary rec/iterative mismatch");
+        if (search_linear_rec(a, n, key) != search_linear(a, n, key))
+            fail("linear rec/iterative mismatch");
+    }
+    printf("fuzz search: %u iters, n 0..%d, four variants cross-checked\n",
+           (unsigned)iters, N);
+}
+
 int main(void)
 {
     fuzz_luhn(100000);
@@ -248,6 +344,9 @@ int main(void)
     fuzz_msort(5000);
     fuzz_slist(10000);
     fuzz_pfac(20000);
+    fuzz_sorts(6000);
+    fuzz_strs(20000);
+    fuzz_search(20000);
     printf("%s: bounded fuzzing complete\n", failures ? "FAIL" : "OK");
     return failures ? 1 : 0;
 }

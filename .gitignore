@@ -2,10 +2,14 @@
 run_tests
 run_tests_release
 run_tests_asan
+run_rest
+run_rest_release
+run_rest_asan
 run_fault
 run_fault_asan
 uaf_probe
 fuzz_test
 std_test
+std_rest
 uaf_probe.out
 *.o
