@@ -2,7 +2,11 @@
  * Oracles: luhn returns only {0,1}; reservoir outputs are distinct and in
  * range; msort matches a reference insertion sort (differential); slist
  * matches an array model; pfac matches a reference factorization and
- * reconstructs its input by multiplication. Deterministic PRNG corpus.
+ * reconstructs its input by multiplication; dlist matches an array model in
+ * both directions; bst matches a set model, including a walk whose visitor
+ * reads the tree; num matches brute-force divisor, gcd, and primality
+ * references; recmath matches iterative references and formatted digits;
+ * euler_number_to_words keeps the snprintf prefix contract for every cap. Deterministic PRNG corpus.
  * Reports iteration counts. Demonstrates explored behavior for this corpus
  * and budget only -- never exhaustive safety. */
 #include <stdio.h>
@@ -17,6 +21,11 @@
 #include "sorts.h"
 #include "strs.h"
 #include "search.h"
+#include "dlist.h"
+#include "bst.h"
+#include "num.h"
+#include "recmath.h"
+#include "euler.h"
 
 static uint64_t f_state = UINT64_C(0x0123456789ABCDEF);
 static uint64_t f_next(void)
@@ -337,6 +346,284 @@ static void fuzz_search(size_t iters)
            (unsigned)iters, N);
 }
 
+/* ---------------- dlist: array model, forward and reverse ----------------- */
+
+static void fuzz_dlist(size_t iters)
+{
+    enum { MODEL = 64, OPS = 128 };
+    int model[MODEL];
+    size_t it, op, nm, i, idx;
+
+    for (it = 0; it < iters; it++) {
+        DList *l = dlist_create();
+        nm = 0;
+        if (l == NULL)
+            continue;
+        for (op = 0; op < OPS; op++) {
+            switch (f_next() % 3) {
+            case 0:
+                if (nm < MODEL) {
+                    int v = (int)(f_next() % 8);
+                    if (dlist_append(l, v) != 0)
+                        fail("dlist append failed with memory available");
+                    model[nm++] = v;
+                }
+                break;
+            case 1: {
+                int v = (int)(f_next() % 8), expect = 0;
+                size_t m, found = 0;
+                for (m = 0; m < nm; m++)
+                    if (model[m] == v) {
+                        found = m;
+                        expect = 1;
+                        break;
+                    }
+                if (dlist_remove_first(l, v) != expect)
+                    fail("dlist remove_first mismatch");
+                if (expect) {
+                    for (i = found; i + 1 < nm; i++)
+                        model[i] = model[i + 1];
+                    nm--;
+                }
+                break;
+            }
+            default:
+                idx = (size_t)(f_next() % (MODEL + 1));
+                if (dlist_length(l) != nm)
+                    fail("dlist length mismatch");
+                if (idx >= nm) {
+                    if (dlist_get(l, idx) != NULL || dlist_get_from_end(l, idx) != NULL)
+                        fail("dlist get out of range");
+                } else if (dlist_get(l, idx) == NULL ||
+                           *dlist_get(l, idx) != model[idx] ||
+                           dlist_get_from_end(l, idx) == NULL ||
+                           *dlist_get_from_end(l, idx) != model[nm - 1 - idx]) {
+                    fail("dlist get value mismatch");
+                }
+                break;
+            }
+        }
+        dlist_destroy(l);
+    }
+    printf("fuzz dlist: %u iters, %u ops each, model-checked both directions\n",
+           (unsigned)iters, (unsigned)OPS);
+}
+
+/* ---------------- bst: set model, walk order, reads during the walk ------ */
+
+enum { BST_KEYS = 64 };
+
+typedef struct {
+    const BST *tree;
+    int seen[BST_KEYS];
+    size_t count;
+    int reads_ok;
+} BSTWalkLog;
+
+static void bst_log_visit(int value, void *user)
+{
+    BSTWalkLog *log = user;
+    if (log->count < BST_KEYS)
+        log->seen[log->count] = value;
+    log->count++;
+    /* read the tree mid-walk: keys are even, so value + 1 is an absent
+     * key that sorts between nodes (the case a threaded walk loops on) */
+    if (!bst_contains(log->tree, value) || bst_contains(log->tree, value + 1))
+        log->reads_ok = 0;
+}
+
+static void fuzz_bst(size_t iters)
+{
+    enum { OPS = 160 };
+    int present[BST_KEYS];
+    size_t it, op, k, nm, j;
+    BSTWalkLog log;
+
+    for (it = 0; it < iters; it++) {
+        BST *t = bst_create();
+        if (t == NULL)
+            continue;
+        memset(present, 0, sizeof present);
+        nm = 0;
+        for (op = 0; op < OPS; op++) {
+            size_t slot = (size_t)(f_next() % BST_KEYS);
+            int key = 2 * (int)slot;
+            switch (f_next() % 4) {
+            case 0:
+                if (bst_insert(t, key) != (present[slot] ? 1 : 0))
+                    fail("bst insert mismatch");
+                if (!present[slot]) {
+                    present[slot] = 1;
+                    nm++;
+                }
+                break;
+            case 1:
+                if (bst_remove(t, key) != present[slot])
+                    fail("bst remove mismatch");
+                if (present[slot]) {
+                    present[slot] = 0;
+                    nm--;
+                }
+                break;
+            case 2:
+                if (bst_contains(t, key) != present[slot] || bst_size(t) != nm)
+                    fail("bst contains/size mismatch");
+                break;
+            default:
+                log.tree = t;
+                log.count = 0;
+                log.reads_ok = 1;
+                bst_walk(t, bst_log_visit, &log);
+                if (log.count != nm || !log.reads_ok)
+                    fail("bst walk count or mid-walk read mismatch");
+                for (k = 0, j = 0; k < BST_KEYS && j < log.count; k++)
+                    if (present[k] && log.seen[j++] != 2 * (int)k)
+                        fail("bst walk order mismatch");
+                break;
+            }
+        }
+        bst_destroy(t);
+    }
+    printf("fuzz bst: %u iters, %u ops each, set-model-checked with walks\n",
+           (unsigned)iters, (unsigned)OPS);
+}
+
+/* ---------------- num: brute-force references ---------------------------- */
+
+static void fuzz_num(size_t iters)
+{
+    enum { MAXN = 5000, CAP = 64 };
+    uint64_t got[CAP], want[CAP];
+    size_t it, count, nwant, cap;
+
+    for (it = 0; it < iters; it++) {
+        uint64_t a = f_next() % MAXN, b = f_next() % MAXN, d, g = 0;
+        int r, prime;
+
+        /* divisors of a, ascending, with snprintf-style capacity */
+        nwant = 0;
+        for (d = 1; d <= a; d++)
+            if (a % d == 0 && nwant < CAP)
+                want[nwant++] = d;
+        cap = (size_t)(f_next() % (CAP + 1));
+        r = num_factors(a, cap ? got : NULL, cap, &count);
+        if (count != nwant || r != (nwant > cap))
+            fail("num_factors count/status mismatch");
+        else if (r == 0 && memcmp(got, want, nwant * sizeof got[0]) != 0)
+            fail("num_factors values mismatch");
+
+        /* common factors: divisors of both */
+        nwant = 0;
+        for (d = 1; d <= (a < b ? a : b); d++)
+            if (a % d == 0 && b % d == 0 && nwant < CAP) {
+                want[nwant++] = d;
+                g = d;
+            }
+        if (a == 0 || b == 0)
+            g = a > b ? a : b; /* gcd(0, x) = x; divisor lists differ there */
+        if (num_gcd(a, b) != g || num_gcd_naive(a, b) != g)
+            fail("gcd mismatch");
+        if (a != 0 && b != 0) {
+            r = num_common_factors(a, b, got, CAP, &count);
+            if (r != 0 || count != nwant ||
+                memcmp(got, want, nwant * sizeof got[0]) != 0)
+                fail("num_common_factors mismatch");
+        }
+
+        prime = a >= 2;
+        for (d = 2; d < a && prime; d++)
+            if (a % d == 0)
+                prime = 0;
+        if (num_is_prime(a) != prime)
+            fail("num_is_prime mismatch");
+    }
+    printf("fuzz num: %u iters, n < %d, brute-force references\n",
+           (unsigned)iters, MAXN);
+}
+
+/* ---------------- recmath: iterative and formatted references ------------ */
+
+static void fuzz_recmath(size_t iters)
+{
+    size_t it;
+    for (it = 0; it < iters; it++) {
+        int64_t n = (int64_t)f_next();
+        unsigned k = (unsigned)(f_next() % 120), j;
+        char digits[32];
+        int want = 0, len, idx;
+        uint64_t v, fa = 0, fb = 1, fact = 1, t;
+
+        if (it == 0)
+            n = INT64_MIN;
+        len = snprintf(digits, sizeof digits, "%lld", (long long)n);
+        for (idx = 0; idx < len; idx++)
+            if (digits[idx] >= '0' && digits[idx] <= '9')
+                want += digits[idx] - '0';
+        if (recmath_sum_of_digits(n) != want)
+            fail("sum_of_digits mismatch");
+
+        for (j = 0; j < k && j < 94; j++) { /* fa = F(min(k, 94)) */
+            t = fa + fb;
+            fa = fb;
+            fb = t;
+        }
+        if (k <= 93) {
+            if (recmath_fibonacci(k, &v) != 0 || v != fa)
+                fail("fibonacci mismatch");
+        } else if (recmath_fibonacci(k, &v) != 1) {
+            fail("fibonacci guard mismatch");
+        }
+
+        for (j = 2; j <= k && j <= 20; j++)
+            fact *= j;
+        if (k <= 20) {
+            if (recmath_factorial(k, &v) != 0 || v != fact)
+                fail("factorial mismatch");
+        } else if (recmath_factorial(k, &v) != 1) {
+            fail("factorial guard mismatch");
+        }
+    }
+    printf("fuzz recmath: %u iters, digits/fibonacci/factorial references\n",
+           (unsigned)iters);
+}
+
+/* ---------------- euler_number_to_words: prefix contract ------------------ */
+
+static void fuzz_words(size_t iters)
+{
+    enum { BUF = 64 };
+    char full[BUF], part[BUF + 1];
+    size_t it, needed, part_needed, cap, wrote, i, letters;
+
+    for (it = 0; it < iters; it++) {
+        unsigned n = (unsigned)(f_next() % 10100); /* past the 9999 edge */
+        cap = (size_t)(f_next() % (BUF + 1));
+        euler_number_to_words(n, full, sizeof full, &needed);
+        if (n > 9999 ? (needed != 0 || full[0] != '\0') : strlen(full) != needed)
+            fail("number_to_words full length mismatch");
+        memset(part, '#', sizeof part);
+        wrote = euler_number_to_words(n, cap ? part : NULL, cap, &part_needed);
+        if (part_needed != needed)
+            fail("number_to_words needed depends on cap");
+        if (cap == 0) {
+            if (wrote != 0 || part[0] != '#')
+                fail("number_to_words wrote with cap 0");
+        } else if (wrote != (needed < cap ? needed : cap - 1) ||
+                   part[wrote] != '\0' || strncmp(part, full, wrote) != 0 ||
+                   part[cap] != '#') {
+            fail("number_to_words prefix contract violated");
+        }
+        letters = 0;
+        for (i = 0; i < needed; i++)
+            if (full[i] != ' ' && full[i] != '-')
+                letters++;
+        if (euler_number_name_letters(n) != letters)
+            fail("number_name_letters disagrees with the words");
+    }
+    printf("fuzz words: %u iters, n 0..10099, cap 0..%d, prefix contract\n",
+           (unsigned)iters, BUF);
+}
+
 int main(void)
 {
     fuzz_luhn(100000);
@@ -347,6 +634,11 @@ int main(void)
     fuzz_sorts(6000);
     fuzz_strs(20000);
     fuzz_search(20000);
+    fuzz_dlist(10000);
+    fuzz_bst(10000);
+    fuzz_num(3000);
+    fuzz_recmath(50000);
+    fuzz_words(50000);
     printf("%s: bounded fuzzing complete\n", failures ? "FAIL" : "OK");
     return failures ? 1 : 0;
 }

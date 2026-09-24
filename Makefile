@@ -30,6 +30,18 @@ fuzz:
 	$(CC) $(CSTD) $(WARN) $(INC) -O1 -g $(SAN) $(SRC) fuzz.c -o fuzz_test
 	./fuzz_test
 
+# Coverage-guided fuzzing of the byte parser (clang libFuzzer). Bounded by
+# time; crashes land in fuzz-artifacts/ and should become regression tests.
+LIBFUZZ_SECONDS ?= 20
+libfuzz:
+	mkdir -p fuzz-artifacts
+	clang $(CSTD) $(WARN) $(INC) -O1 -g -fsanitize=fuzzer,address,undefined -fno-sanitize-recover=all luhn.c fuzz_luhn_lf.c -o fuzz_luhn_lf
+	./fuzz_luhn_lf -max_total_time=$(LIBFUZZ_SECONDS) -max_len=4096 \
+		-artifact_prefix=fuzz-artifacts/ -print_final_stats=1 \
+		> fuzz-artifacts/libfuzz.log 2>&1; status=$$?; \
+		grep -E 'Done|number_of_executed_units|ERROR|SUMMARY|deadly' fuzz-artifacts/libfuzz.log; \
+		exit $$status
+
 analyze:
 	gcc $(CSTD) $(WARN) $(INC) -fanalyzer -c $(SRC)
 
@@ -72,9 +84,9 @@ stdmatrix:
 # Portability matrix: both compilers across behavior, optimization, sanitizers.
 gates:
 	for cc in gcc clang; do $(MAKE) CC=$$cc debug release asan fault uaf || exit 1; done
-	$(MAKE) fuzz analyze stdmatrix
+	$(MAKE) fuzz libfuzz analyze stdmatrix
 
 clean:
-	rm -f run_tests run_tests_release run_tests_asan run_rest run_rest_release run_rest_asan run_fault run_fault_asan uaf_probe fuzz_test std_test std_rest *.o uaf_probe.out
+	rm -f run_tests run_tests_release run_tests_asan run_rest run_rest_release run_rest_asan run_fault run_fault_asan uaf_probe fuzz_test std_test std_rest fuzz_luhn_lf *.o uaf_probe.out
 
-.PHONY: all debug release asan fuzz analyze fault uaf stdmatrix gates clean
+.PHONY: all debug release asan fuzz libfuzz analyze fault uaf stdmatrix gates clean

@@ -13,3 +13,5 @@ std_test
 std_rest
 uaf_probe.out
 *.o
+fuzz_luhn_lf
+fuzz-artifacts/
