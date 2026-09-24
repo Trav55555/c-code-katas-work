@@ -47,6 +47,8 @@ static void test_luhn(void)
     CHECK(luhn_is_valid("") == 0);                 /* empty: invalid */
     CHECK(luhn_is_valid("   ") == 0);              /* all spaces: invalid */
     CHECK(luhn_is_valid("12x4") == 0);             /* foreign byte */
+    CHECK(luhn_is_valid("x79927398713") == 0);     /* foreign first byte */
+    CHECK(luhn_is_valid("a") == 0);                /* foreign sole byte */
     CHECK(luhn_is_valid("12\t4") == 0);            /* control byte */
     CHECK(luhn_is_valid("12-4") == 0);             /* punctuation */
     CHECK(luhn_is_valid(NULL) == 0);               /* defensive total call */
@@ -140,6 +142,11 @@ static void test_msort(void)
     CHECK(msort_sort(NULL, 0) == 0);      /* documented NULL case */
     CHECK(msort_sort(one, 0) == 0);       /* n == 0 on live pointer */
     CHECK(msort_sort(one, 1) == 0);       /* single element */
+    /* scratch size would overflow: -1 before touching the array */
+    {
+        int guard[1] = { 7 };
+        CHECK(msort_sort(guard, SIZE_MAX / sizeof(int) + 1) == -1 && guard[0] == 7);
+    }
     CHECK(one[0] == 5);
     CHECK(msort_sort(two, 2) == 0 && two[0] == 1 && two[1] == 2);
     CHECK(msort_sort(dup, 6) == 0);
@@ -232,6 +239,18 @@ static void test_pfac(void)
     CHECK(pfac_factorize(12, f, 4, &count) == 0);                 /* one over */
     CHECK(pfac_factorize(12, NULL, 0, &count) == 1 && count == 3); /* count-only */
     CHECK(pfac_factorize(1, NULL, 0, &count) == 0 && count == 0);  /* count-only fit */
+    { /* exact-size heap buffers: ASan sees a write at factors[cap], which
+       * the oversized f[80] above would absorb */
+        size_t cap;
+        for (cap = 0; cap <= 4; cap++) {
+            uint64_t *exact = (cap > 0) ? malloc(cap * sizeof *exact) : NULL;
+            if (cap > 0 && exact == NULL)
+                continue;
+            CHECK(pfac_factorize(12, exact, cap, &count) == (cap < 3 ? 1 : 0));
+            CHECK(count == 3);
+            free(exact);
+        }
+    }
 
     /* 2^63 has 63 factors of 2: exercises capacity reporting at scale */
     CHECK(pfac_factorize(UINT64_C(1) << 63, f, 80, &count) == 0 && count == 63);

@@ -1,6 +1,7 @@
 /* Boundary, differential, and known-answer tests for the second kata set
  * (sorts, search, dlist, bst, num, strs, recmath, euler). */
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 #include <limits.h>
@@ -633,10 +634,23 @@ static void test_euler(void)
     CHECK(euler_maximum_path_sum(flat, SIZE_MAX) == 0); /* entry count overflows */
 
     CHECK(euler_sieve(1, primes, 200, &count) == 0 && count == 0);
+    CHECK(euler_sieve(2, primes, 200, &count) == 0 && count == 1 && primes[0] == 2);
+    CHECK(euler_sieve(29, primes, 200, &count) == 0 && count == 10 && primes[9] == 29);
     CHECK(euler_sieve(30, primes, 200, &count) == 0 && count == 10);
     CHECK(primes[0] == 2 && primes[4] == 11 && primes[9] == 29);
     CHECK(euler_sieve(1000, primes, 200, &count) == 0 && count == 168);
     CHECK(euler_sieve(30, primes, 5, &count) == 1 && count == 10); /* truncated */
+    { /* exact-size heap buffers around the capacity edge (10 primes <= 30) */
+        size_t cap;
+        for (cap = 9; cap <= 11; cap++) {
+            unsigned *exact = malloc(cap * sizeof *exact);
+            if (exact == NULL)
+                continue;
+            CHECK(euler_sieve(30, exact, cap, &count) == (cap < 10 ? 1 : 0));
+            CHECK(count == 10 && exact[cap < 10 ? cap - 1 : 9] == (cap < 10 ? 23u : 29u));
+            free(exact);
+        }
+    }
 }
 
 int main(void)

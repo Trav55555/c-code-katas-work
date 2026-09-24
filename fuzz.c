@@ -10,6 +10,7 @@
  * Reports iteration counts. Demonstrates explored behavior for this corpus
  * and budget only -- never exhaustive safety. */
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 
@@ -221,15 +222,23 @@ static void ref_factorize(uint64_t n, uint64_t *f, size_t *count)
 
 static void fuzz_pfac(size_t iters)
 {
-    uint64_t f[80], rf[80], product;
+    uint64_t *f, rf[80], product;
     size_t it, count, rcount, cap, i;
 
     for (it = 0; it < iters; it++) {
         /* bounded n keeps trial division cheap; the 2^64 edges live in tests */
         uint64_t n = f_next() % UINT64_C(1000000);
         int ret;
-        cap = (size_t)(f_next() % 71);
         ref_factorize(n, rf, &rcount);
+        /* half the draws sit on the capacity edge (count - 1 .. count + 1);
+         * the buffer is exactly cap elements so ASan sees a write past it */
+        if (f_next() % 2 == 0)
+            cap = (size_t)(f_next() % 71);
+        else
+            cap = rcount + (size_t)(f_next() % 3) - (rcount > 0 ? 1 : 0);
+        f = (cap > 0) ? malloc(cap * sizeof *f) : NULL;
+        if (cap > 0 && f == NULL)
+            continue;
         ret = pfac_factorize(n, f, cap, &count);
         if (count != rcount)
             fail("pfac count mismatch vs reference");
@@ -248,8 +257,9 @@ static void fuzz_pfac(size_t iters)
                 if (f[i] != rf[i])
                     fail("pfac truncated prefix mismatch");
         }
+        free(f);
     }
-    printf("fuzz pfac: %u iters, n < 10^6, cap 0..70, reference oracle\n",
+    printf("fuzz pfac: %u iters, n < 10^6, cap 0..70 (half on the edge), exact buffers\n",
            (unsigned)iters);
 }
 
