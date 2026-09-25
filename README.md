@@ -52,4 +52,4 @@ but not exercised; the quicksort duplicate test is a wall-clock budget.
 
 ## License
 
-MIT; see `LICENSE`. `euler_data.h` is extracted from the upstream kata set, also MIT (Copyright (c) 2016 Ankit Pokhrel).
+MIT; see `LICENSE`. `euler_data.h` is extracted from the upstream kata set, also MIT (Copyright (c) 2016 Ankit Pokhrel); its notice is in `NOTICE`.
