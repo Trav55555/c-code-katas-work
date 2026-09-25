@@ -4,7 +4,21 @@ All katas from [ankitpokhrel/c-code-katas](https://github.com/ankitpokhrel/c-cod
 (46 programs) implemented with explicit contracts and a verification matrix
 (`c-development` skill workflow). C99, gcc 15 + clang 23, x86-64.
 
-| Module | Katas | Contract highlight |
+## Layout
+
+```text
+src/     one module per kata group (.c + .h), plus internal helpers
+         checked.h (overflow-checked uint64 arithmetic), rng.h (xorshift64*
+         with rejection-sampled ranges), euler_data.h (upstream datasets)
+tests/   tests.c, tests_rest.c (behavior), fault_tests.c + fault_alloc.[ch]
+         (allocation-failure injection), uaf_probe.c (expected ASan abort)
+fuzz/    fuzz.c (bounded model/reference fuzzing), fuzz_luhn_lf.c (libFuzzer)
+build/   every build output and fuzz artifact; `make clean` removes it
+```
+
+## Modules
+
+| Module (`src/`) | Katas | Contract highlight |
 |---|---|---|
 | `luhn.c/.h` | Luhn algorithm | total function over untrusted bytes; running-mod-10 accumulator (unbounded length) |
 | `slist.c/.h` | Singly linked list | ownership/borrowing/invalidation rules; alloc failure leaves list unchanged |
@@ -35,21 +49,18 @@ make stdmatrix # c99/c11/c17/c2x x gcc/clang, compile + run
 
 Warnings are errors: `-Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wstrict-prototypes -Werror`.
 
-Internal helpers shared across modules live in `checked.h` (overflow-checked
-uint64 arithmetic) and `rng.h` (xorshift64* with rejection-sampled ranges).
-
 `make fault` redefines `malloc` with `-Dmalloc=fault_malloc`, which is
 undefined behavior by the letter of C99 7.1.3. It is a deliberate,
-test-only project decision; see `fault_alloc.h`.
+test-only project decision; see `tests/fault_alloc.h`.
 
 Known gaps: no 32-bit or Windows/MSVC testing (no multilib on this host);
 no TSan (all single-threaded); fuzzing demonstrates explored behavior for
 the stated corpus and budget only; `pfac`/`num_factors` are O(sqrt n) by
 construction (large semiprimes are slow, documented); the fault build
 covers `malloc` in slist/msort/dlist/bst only, so the `calloc`/`malloc`
-failure paths in `euler.c` (Collatz cache, PE16, PE18, sieve) are reviewed
+failure paths in `src/euler.c` (Collatz cache, PE16, PE18, sieve) are reviewed
 but not exercised; the quicksort duplicate test is a wall-clock budget.
 
 ## License
 
-MIT; see `LICENSE`. `euler_data.h` is extracted from the upstream kata set, also MIT (Copyright (c) 2016 Ankit Pokhrel); its notice is in `NOTICE`.
+MIT; see `LICENSE`. `src/euler_data.h` is extracted from the upstream kata set, also MIT (Copyright (c) 2016 Ankit Pokhrel); its notice is in `NOTICE`.

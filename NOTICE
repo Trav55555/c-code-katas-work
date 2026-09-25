@@ -1,4 +1,4 @@
-euler_data.h contains data extracted from
+src/euler_data.h contains data extracted from
 https://github.com/ankitpokhrel/c-code-katas, distributed under the MIT
 License:
 
