@@ -49,3 +49,7 @@ construction (large semiprimes are slow, documented); the fault build
 covers `malloc` in slist/msort/dlist/bst only, so the `calloc`/`malloc`
 failure paths in `euler.c` (Collatz cache, PE16, PE18, sieve) are reviewed
 but not exercised; the quicksort duplicate test is a wall-clock budget.
+
+## License
+
+MIT; see `LICENSE`. `euler_data.h` is extracted from the upstream kata set, also MIT (Copyright (c) 2016 Ankit Pokhrel).
